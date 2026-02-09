@@ -1,0 +1,1 @@
+Can you write me a qiskit code that will add 2 numbers that are each between 0 and 7 included ? And use only CNOT gates 
