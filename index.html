@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte de France - Prix des carburants par région</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .selector {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        select {
+            padding: 12px 30px;
+            font-size: 18px;
+            border: 2px solid #667eea;
+            border-radius: 25px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        select:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .map-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        #map {
+            height: 700px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .legend {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            max-height: 700px;
+            overflow-y: auto;
+        }
+        
+        .legend-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .color-scale {
+            height: 40px;
+            background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+            border-radius: 5px;
+            margin: 15px 0;
+            border: 2px solid #ddd;
+        }
+        
+        .scale-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        
+        tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .color-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 10px;
+            vertical-align: middle;
+            border: 1px solid #ccc;
+        }
+        
+        .prix {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .leaflet-popup-content {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .leaflet-popup-content strong {
+            color: #667eea;
+            font-size: 16px;
+        }
+        
+        @media (max-width: 1200px) {
+            .map-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Carte de France - Prix des carburants</h1>
+            <div class="subtitle">Données du 28/03/2026 - Source: data.gouv.fr</div>
+        </div>
+        
+        <div class="content">
+            <div class="selector">
+                <label for="carburant" style="font-size: 1.2em; margin-right: 15px;">Type de carburant:</label>
+                <select id="carburant" onchange="updateMap()">
+                    <option value="Gazole">🚗 Gazole</option>
+                    <option value="E10">⛽ E10 (SP95-E10)</option>
+                    <option value="SP95">⛽ SP95</option>
+                    <option value="SP98">⛽ SP98</option>
+                    <option value="E85">🌱 E85 (Bioéthanol)</option>
+                    <option value="GPLc">💨 GPLc</option>
+                </select>
+            </div>
+            
+            <div id="stats" class="stats-grid">
+                <div class="loading">Chargement des données...</div>
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="legend">
+                    <div class="legend-title">📊 Légende des prix</div>
+                    <div id="legend-content">
+                        <div class="loading">Chargement...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Données des prix par région (à remplacer par vos données réelles)
+        const prixData = {
+            "Gazole": {
+                "Auvergne-Rhône-Alpes": 2.254,
+                "Bourgogne-Franche-Comté": 2.258,
+                "Bretagne": 2.230,
+                "Centre-Val de Loire": 2.266,
+                "Grand Est": 2.249,
+                "Hauts-de-France": 2.259,
+                "Île-de-France": 2.241,
+                "Normandie": 2.243,
+                "Nouvelle-Aquitaine": 2.252,
+                "Occitanie": 2.252,
+                "Pays de la Loire": 2.244,
+                "Provence-Alpes-Côte d'Azur": 2.243
+            },
+            "E10": {
+                "Auvergne-Rhône-Alpes": 2.023,
+                "Bourgogne-Franche-Comté": 2.003,
+                "Bretagne": 1.956,
+                "Centre-Val de Loire": 1.997,
+                "Grand Est": 1.986,
+                "Hauts-de-France": 1.981,
+                "Île-de-France": 2.007,
+                "Normandie": 1.981,
+                "Nouvelle-Aquitaine": 1.980,
+                "Occitanie": 2.011,
+                "Pays de la Loire": 1.970,
+                "Provence-Alpes-Côte d'Azur": 2.016
+            },
+            "SP95": {
+                "Auvergne-Rhône-Alpes": 2.063,
+                "Bourgogne-Franche-Comté": 2.042,
+                "Bretagne": 1.996,
+                "Centre-Val de Loire": 2.028,
+                "Grand Est": 2.027,
+                "Hauts-de-France": 2.019,
+                "Île-de-France": 2.037,
+                "Normandie": 2.017,
+                "Nouvelle-Aquitaine": 2.014,
+                "Occitanie": 2.055,
+                "Pays de la Loire": 2.014,
+                "Provence-Alpes-Côte d'Azur": 2.065
+            },
+            "SP98": {
+                "Auvergne-Rhône-Alpes": 2.111,
+                "Bourgogne-Franche-Comté": 2.096,
+                "Bretagne": 2.035,
+                "Centre-Val de Loire": 2.084,
+                "Grand Est": 2.061,
+                "Hauts-de-France": 2.066,
+                "Île-de-France": 2.087,
+                "Normandie": 2.057,
+                "Nouvelle-Aquitaine": 2.068,
+                "Occitanie": 2.099,
+                "Pays de la Loire": 2.058,
+                "Provence-Alpes-Côte d'Azur": 2.099
+            },
+            "E85": {
+                "Auvergne-Rhône-Alpes": 0.827,
+                "Bourgogne-Franche-Comté": 0.827,
+                "Bretagne": 0.767,
+                "Centre-Val de Loire": 0.796,
+                "Grand Est": 0.800,
+                "Hauts-de-France": 0.802,
+                "Île-de-France": 0.855,
+                "Normandie": 0.797,
+                "Nouvelle-Aquitaine": 0.789,
+                "Occitanie": 0.813,
+                "Pays de la Loire": 0.780,
+                "Provence-Alpes-Côte d'Azur": 0.837
+            },
+            "GPLc": {
+                "Auvergne-Rhône-Alpes": 1.010,
+                "Bourgogne-Franche-Comté": 0.994,
+                "Bretagne": 0.952,
+                "Centre-Val de Loire": 0.991,
+                "Grand Est": 0.973,
+                "Hauts-de-France": 0.980,
+                "Île-de-France": 1.008,
+                "Normandie": 0.973,
+                "Nouvelle-Aquitaine": 0.988,
+                "Occitanie": 1.010,
+                "Pays de la Loire": 0.969,
+                "Provence-Alpes-Côte d'Azur": 0.994
+            }
+        };
+        
+        let map;
+        let geojsonLayer;
+        
+        function getColor(prix, min, max) {
+            if (max === min) return '#ffff00';
+            const ratio = (prix - min) / (max - min);
+            let r, g, b;
+            if (ratio < 0.33) {
+                r = Math.floor(0 + ratio * 3 * 255);
+                g = 255;
+                b = 0;
+            } else if (ratio < 0.67) {
+                r = 255;
+                g = Math.floor(255 - (ratio - 0.33) * 3 * 255);
+                b = 0;
+            } else {
+                r = 255;
+                g = 0;
+                b = 0;
+            }
+            return `rgb(${r},${g},${b})`;
+        }
+        
+        function updateStats(carburant) {
+            const data = prixData[carburant];
+            const prix = Object.values(data);
+            const min = Math.min(...prix);
+            const max = Math.max(...prix);
+            const avg = prix.reduce((a, b) => a + b, 0) / prix.length;
+            
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${avg.toFixed(3)} €/L</div>
+                    <div class="stat-label">Prix moyen national</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${min.toFixed(3)} €/L</div>
+                    <div class="stat-label">Prix minimum</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${max.toFixed(3)} €/L</div>
+                    <div class="stat-label">Prix maximum</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${(max - min).toFixed(3)} €/L</div>
+                    <div class="stat-label">Écart maximum</div>
+                </div>
+            `;
+            
+            // Update legend
+            const sortedRegions = Object.entries(data).sort((a, b) => a[1] - b[1]);
+            let tableHTML = `
+                <div class="color-scale"></div>
+                <div class="scale-labels">
+                    <span>Moins cher<br><strong>${min.toFixed(3)} €/L</strong></span>
+                    <span>Moyen<br><strong>${avg.toFixed(3)} €/L</strong></span>
+                    <span>Plus cher<br><strong>${max.toFixed(3)} €/L</strong></span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Région</th>
+                            <th>Prix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            sortedRegions.forEach(([region, prix]) => {
+                const color = getColor(prix, min, max);
+                tableHTML += `
+                    <tr>
+                        <td><span class="color-box" style="background-color: ${color};"></span> ${region}</td>
+                        <td class="prix">${prix.toFixed(3)} €/L</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += '</tbody></table>';
+            document.getElementById('legend-content').innerHTML = tableHTML;
+        }
+        
+        function updateMap() {
+            const carburant = document.getElementById('carburant').value;
+            updateStats(carburant);
+            
+            if (geojsonLayer) {
+                map.removeLayer(geojsonLayer);
+            }
+            
+            const data = prixData[carburant];
+            const prix = Object.values(data);
+            const min = Math.min(...prix);
+            const max = Math.max(...prix);
+            
+            // Charger les données GeoJSON des régions françaises
+            fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions-version-simplifiee.geojson')
+                .then(response => response.json())
+                .then(geojson => {
+                    geojsonLayer = L.geoJSON(geojson, {
+                        style: function(feature) {
+                            const regionName = feature.properties.nom;
+                            const prix = data[regionName] || 0;
+                            return {
+                                fillColor: getColor(prix, min, max),
+                                weight: 2,
+                                opacity: 1,
+                                color: 'white',
+                                fillOpacity: 0.7
+                            };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            const regionName = feature.properties.nom;
+                            const prix = data[regionName];
+                            if (prix) {
+                                layer.bindPopup(`
+                                    <strong>${regionName}</strong><br>
+                                    ${carburant}: <strong>${prix.toFixed(3)} €/L</strong>
+                                `);
+                                
+                                layer.on('mouseover', function() {
+                                    this.setStyle({
+                                        weight: 4,
+                                        fillOpacity: 0.9
+                                    });
+                                });
+                                
+                                layer.on('mouseout', function() {
+                                    this.setStyle({
+                                        weight: 2,
+                                        fillOpacity: 0.7
+                                    });
+                                });
+                            }
+                        }
+                    }).addTo(map);
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement de la carte:', error);
+                    alert('Erreur lors du chargement de la carte. Vérifiez votre connexion internet.');
+                });
+        }
+        
+        // Initialiser la carte
+        document.addEventListener('DOMContentLoaded', function() {
+            map = L.map('map').setView([46.603354, 1.888334], 6);
+            
+            // Utiliser CartoDB Positron qui ne bloque pas l'accès
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© OpenStreetMap contributors © CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+            
+            updateMap();
+        });
+    </script>
+</body>
+</html>
