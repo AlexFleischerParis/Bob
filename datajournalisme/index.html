@@ -233,20 +233,29 @@ function getBounds(features){
   return _bounds;
 }
 
-function toSvg(lon,lat,b,W,H){
+// Uniform scale: fit bbox into viewport while preserving aspect ratio, centered.
+function makeTransform(b,W,H){
+  const bw=b.x1-b.x0, bh=b.y1-b.y0;
+  const scale=Math.min(W/bw, H/bh)*0.97; // 0.97 = small padding
+  const ox=(W-bw*scale)/2;
+  const oy=(H-bh*scale)/2;
+  return{scale,ox,oy,b};
+}
+
+function toSvg(lon,lat,tr){
   const[x,y]=project(lon,lat);
-  return[(x-b.x0)/(b.x1-b.x0)*W, H-(y-b.y0)/(b.y1-b.y0)*H];
+  return[(x-tr.b.x0)*tr.scale+tr.ox, (tr.b.y1-y)*tr.scale+tr.oy];
 }
 
-function ringPath(ring,b,W,H){
+function ringPath(ring,tr){
   if(!ring||ring.length<2)return"";
-  return"M"+ring.map(c=>{const[sx,sy]=toSvg(c[0],c[1],b,W,H);return sx.toFixed(1)+","+sy.toFixed(1);}).join("L")+"Z";
+  return"M"+ring.map(c=>{const[sx,sy]=toSvg(c[0],c[1],tr);return sx.toFixed(1)+","+sy.toFixed(1);}).join("L")+"Z";
 }
 
-function geoPath(geo,b,W,H){
+function geoPath(geo,tr){
   if(!geo)return"";
-  if(geo.type==="Polygon")return geo.coordinates.map(r=>ringPath(r,b,W,H)).join(" ");
-  if(geo.type==="MultiPolygon")return geo.coordinates.map(p=>p.map(r=>ringPath(r,b,W,H)).join(" ")).join(" ");
+  if(geo.type==="Polygon")return geo.coordinates.map(r=>ringPath(r,tr)).join(" ");
+  if(geo.type==="MultiPolygon")return geo.coordinates.map(p=>p.map(r=>ringPath(r,tr)).join(" ")).join(" ");
   return"";
 }
 
@@ -270,6 +279,7 @@ function renderMap(){
   const W=svg.clientWidth||800,H=svg.clientHeight||600;
   if(W<10||H<10)return;
   const b=getBounds(geoFeatures);
+  const tr=makeTransform(b,W,H);
   const vals=getVals();
   if(!vals.length)return;
   const mn=Math.min(...vals),mx=Math.max(...vals);
@@ -281,7 +291,7 @@ function renderMap(){
     const code=normCode(props.code);
     const d=deptData[code];
     const val=d?d[currentFuel]:null;
-    const pathStr=geoPath(f.geometry,b,W,H);
+    const pathStr=geoPath(f.geometry,tr);
     if(!pathStr)return;
     const path=document.createElementNS("http://www.w3.org/2000/svg","path");
     path.setAttribute("d",pathStr);
